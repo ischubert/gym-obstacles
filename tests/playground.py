@@ -5,16 +5,17 @@ import matplotlib.pyplot as plt
 env_goal = gym.make(
     'gym_obstacles:obstacles-v0',
     plan_or_goal='goal',
-    plan_length=None
+    plan_length=None,
+    n_boxes=3
 )
 
 env_plan = gym.make(
     'gym_obstacles:obstacles-v0',
     plan_or_goal='plan',
-    plan_length=50
+    plan_length=50,
+    n_boxes=3
 )
 
-# %%
 env_goal.reset()
 env_goal.render()
 plt.show()

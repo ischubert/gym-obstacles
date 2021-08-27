@@ -11,9 +11,38 @@ class ObstaclesEnv(gym.Env):
     """
     metadata = {'render.modes': ['human']}
 
-    def __init__(self, plan_or_goal, plan_length):
+    def __init__(self, plan_or_goal, plan_length, n_boxes):
         self.plan_or_goal = plan_or_goal
         self.plan_length = plan_length
+
+        # create obstacle boxes
+        boxes_origin = np.random.rand(
+            n_boxes, 2
+        )
+        boxes_end = boxes_origin.copy()
+        mask = np.ones(boxes_end.shape)
+        while np.any(mask):
+            boxes_end = np.where(
+                mask,
+                boxes_origin - 0.5 + 1.0* np.random.rand(
+                    n_boxes, 2
+                ),
+                boxes_end
+            )
+            # First criterion: Box is included in state space
+            mask = np.logical_or(
+                boxes_end>1, boxes_end<0
+            )
+            # Second criterion: Box is at least 0.1 in width
+            mask = np.logical_or(
+                mask,
+                np.abs(boxes_end - boxes_origin) < 0.1
+            )
+        
+        self.boxes = np.concatenate(
+            (boxes_origin, boxes_end),
+            axis=-1
+        )
 
         assert self.plan_or_goal in ["plan", "goal"]
         if self.plan_or_goal == "plan":
@@ -63,13 +92,14 @@ class ObstaclesEnv(gym.Env):
         """
         Simulate the system's transition under an action
         """
+        print("CAUTION: ADD NOISE")
         # clip action to [-0.1, 0.1]
         action = np.clip(action, -0.1, 0.1)
         assert action in self.action_space
 
         # update self.state
         candidate = self.state + action
-        if candidate in self.state_space:
+        if candidate in self.observation_space["observation_space"]:
             if self._not_in_collision(candidate):
                 self.state = candidate
         
@@ -156,7 +186,17 @@ class ObstaclesEnv(gym.Env):
             ]
         )
 
-        ax.imshow(rewards.reshape(50, 50).T[::-1], extent=[0, 1, 0, 1])
+        # draw -1 everywhere where collision happens
+        not_in_collision = np.array(
+            [self._not_in_collision(achieved_goal_now) for achieved_goal_now in achieved_goal_plot]
+        )
+        image = np.where(
+            not_in_collision,
+            rewards,
+            -1
+        )
+
+        ax.imshow(image.reshape(50, 50).T[::-1], extent=[0, 1, 0, 1])
 
         ax.set_xlim(0, 1)
         ax.set_ylim(0, 1)
@@ -232,9 +272,18 @@ class ObstaclesEnv(gym.Env):
         """
         Return boolean that is true if state is not in collision, and false if it is
         """
-        print("CAUTION: THIS IS ONLY A TEST IMPLEMENTATION FOR NOW")
-        # raise NotImplementedError
-        return True
+        no_collision = True
+
+        for box in self.boxes:
+            # check if state is in between (not necessarily box[0]>box[2] etc.)
+            if (
+                (state[0] - box[0]) * (state[0] - box[2]) <= 0 # >0 if outside
+                and (state[1] - box[1]) * (state[1] - box[3]) <= 0
+            ):
+                no_collision = False
+                break # save testing for the other boxes
+        
+        return no_collision
 
     def _sample_feasible_plan(self, state, goal):
         """
