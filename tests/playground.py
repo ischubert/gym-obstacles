@@ -38,3 +38,14 @@ env_plan.render()
 plt.show()
 
 # %%
+env_goal.reset()
+env_goal.render()
+plt.show()
+
+# %%
+observation, reward, done, info = env_goal.step([0, 0.05])
+print(observation, reward, done, info)
+env_goal.render()
+plt.show()
+
+# %%
