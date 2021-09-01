@@ -107,6 +107,18 @@ class ObstaclesEnv(gym.Env):
     def reset(self):
         """
         Reset environment to random state and random desired goal
+        Some configs create 0-length plans, ignore these
+        """
+        while True:
+            try:
+                return self._try_reset()
+            except IndexError:
+                # happens if 0-length plans are created
+                pass
+
+    def _try_reset(self):
+        """
+        Reset environment to random state and random desired goal
         """
         # update obstacles
         self.boxes = self._create_obstacles(self.n_boxes)
