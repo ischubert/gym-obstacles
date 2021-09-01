@@ -4,6 +4,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import gym
+from gym_obstacles.planners.rrt import pathSearch
 
 class ObstaclesEnv(gym.Env):
     """
@@ -11,38 +12,12 @@ class ObstaclesEnv(gym.Env):
     """
     metadata = {'render.modes': ['human']}
 
-    def __init__(self, plan_or_goal, plan_length, n_boxes):
+    def __init__(self, plan_or_goal, plan_length, n_boxes, planner_tolerance):
         self.plan_or_goal = plan_or_goal
         self.plan_length = plan_length
+        self.n_boxes = n_boxes
+        self.planner_tolerance = planner_tolerance
 
-        # create obstacle boxes
-        boxes_origin = np.random.rand(
-            n_boxes, 2
-        )
-        boxes_end = boxes_origin.copy()
-        mask = np.ones(boxes_end.shape)
-        while np.any(mask):
-            boxes_end = np.where(
-                mask,
-                boxes_origin - 0.5 + 1.0* np.random.rand(
-                    n_boxes, 2
-                ),
-                boxes_end
-            )
-            # First criterion: Box is included in state space
-            mask = np.logical_or(
-                boxes_end>1, boxes_end<0
-            )
-            # Second criterion: Box is at least 0.1 in width
-            mask = np.logical_or(
-                mask,
-                np.abs(boxes_end - boxes_origin) < 0.1
-            )
-        
-        self.boxes = np.concatenate(
-            (boxes_origin, boxes_end),
-            axis=-1
-        )
 
         assert self.plan_or_goal in ["plan", "goal"]
         if self.plan_or_goal == "plan":
@@ -87,19 +62,21 @@ class ObstaclesEnv(gym.Env):
 
         self.current_target = None
 
+        self.boxes = None
+
 
     def step(self, action):
         """
         Simulate the system's transition under an action
         """
-        print("CAUTION: ADD NOISE")
         # clip action to [-0.1, 0.1]
+        action = action + 2*(np.random.rand(2)-0.5)*0.01
         action = np.clip(action, -0.1, 0.1)
         assert action in self.action_space
 
         # update self.state
         candidate = self.state + action
-        if candidate in self.observation_space["observation_space"]:
+        if candidate in self.observation_space["observation"]:
             if self._not_in_collision(candidate):
                 self.state = candidate
         
@@ -131,6 +108,8 @@ class ObstaclesEnv(gym.Env):
         """
         Reset environment to random state and random desired goal
         """
+        # update obstacles
+        self.boxes = self._create_obstacles(self.n_boxes)
         # update self.state
         self.state = self._sample_non_colliding_state()
         
@@ -159,8 +138,6 @@ class ObstaclesEnv(gym.Env):
         """
         Create interactive view of the environment
         """
-        print("TODO: OBSTACLE VIZ STILL MISSING HERE")
-        print("TODO: REWARD VIZ STILL MISSING HERE")
         fig, ax = plt.subplots(figsize=(5, 5))
 
         # add reward
@@ -235,6 +212,36 @@ class ObstaclesEnv(gym.Env):
 
         return reward
 
+    def _create_obstacles(self, n_boxes):
+        # create obstacle boxes
+        boxes_origin = np.random.rand(
+            n_boxes, 2
+        )
+        boxes_end = boxes_origin.copy()
+        mask = np.ones(boxes_end.shape)
+        while np.any(mask):
+            boxes_end = np.where(
+                mask,
+                boxes_origin - 0.5 + 1.0* np.random.rand(
+                    n_boxes, 2
+                ),
+                boxes_end
+            )
+            # First criterion: Box is included in state space
+            mask = np.logical_or(
+                boxes_end>1, boxes_end<0
+            )
+            # Second criterion: Box is at least 0.1 in width
+            mask = np.logical_or(
+                mask,
+                np.abs(boxes_end - boxes_origin) < 0.1
+            )
+        
+        return np.concatenate(
+            (boxes_origin, boxes_end),
+            axis=-1
+        )
+
     def _get_binary_reward(self, achieved_goal, current_target):
         """
         Get binary (sparse) goal reward
@@ -272,7 +279,8 @@ class ObstaclesEnv(gym.Env):
         """
         Return boolean that is true if state is not in collision, and false if it is
         """
-        no_collision = True
+        if not self.observation_space['observation'].contains(np.array(state)):
+            return False
 
         for box in self.boxes:
             # check if state is in between (not necessarily box[0]>box[2] etc.)
@@ -280,18 +288,54 @@ class ObstaclesEnv(gym.Env):
                 (state[0] - box[0]) * (state[0] - box[2]) <= 0 # >0 if outside
                 and (state[1] - box[1]) * (state[1] - box[3]) <= 0
             ):
-                no_collision = False
-                break # save testing for the other boxes
+                return False
         
-        return no_collision
+        return True
+    
+    def not_in_collision_for_planner(self, state):
+        """"
+        Returns true if no collision AND there is enough space around the next object
+        """
+        # if there is real collision, return False already here
+        if not self._not_in_collision(state):
+            return False
+        
+        # TODO this is not correct yet: I also exclude points that are close in x and far away in y etc.
+        # for box in self.boxes:
+        #     # At this point the point is not in the box, but if tolerance is not cleared,
+        #     # then still return False
+        #     if not (
+        #         np.min(np.abs(box[[0, 2]] - state[0])) > self.planner_tolerance
+        #         and np.min(np.abs(box[[1, 3]] - state[1])) > self.planner_tolerance
+        #     ):
+        #         return False
+        
+        return True
+
 
     def _sample_feasible_plan(self, state, goal):
         """
         Sample a feasible plan leading from state to goal
         """
-        print("CAUTION: THIS IS ONLY A TEST IMPLEMENTATION FOR NOW")
-        # raise NotImplementedError
-        return (
-            state[:, None] + (goal-state)[:, None]*np.linspace(0, 1, self.plan_length)[None, :]
-        ).reshape(-1)
-    
+        path = np.array(pathSearch(
+            self, 500, 0.1, 0.05, 0.05
+        ))
+
+        dists = np.insert(
+            np.cumsum(np.linalg.norm(
+                path[1:] - path[:-1],
+                axis=-1
+            )),
+            0,
+            0.0
+        )
+
+        plan = np.zeros((self.plan_length, 2))
+
+        for ind in range(2):
+            plan[:, ind] = np.interp(
+                np.linspace(0, dists[-1], self.plan_length),
+                dists,
+                path[:, ind]
+            )
+        return plan.T.reshape(-1)
