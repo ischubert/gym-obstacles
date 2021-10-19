@@ -135,7 +135,7 @@ class ObstaclesEnv(gym.Env):
         if self.plan_or_goal == "goal":
             self.desired_goal = self.current_target.copy()
         if self.plan_or_goal == "plan":
-            self.desired_goal = self._sample_feasible_plan(self.state, self.current_target)
+            self.desired_goal = self._sample_feasible_plan()
         
         # collect output
         observation = {
@@ -321,11 +321,11 @@ class ObstaclesEnv(gym.Env):
         #         and np.min(np.abs(box[[1, 3]] - state[1])) > self.planner_tolerance
         #     ):
         #         return False
-        
+
         return True
 
 
-    def _sample_feasible_plan(self, state, goal):
+    def _sample_feasible_plan(self):
         """
         Sample a feasible plan leading from state to goal
         """
