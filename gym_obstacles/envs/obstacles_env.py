@@ -197,6 +197,7 @@ class ObstaclesEnv(gym.Env):
             plan = self.desired_goal.reshape(2, self.plan_length)
             ax.plot(plan[0, :], plan[1, :], label="plan")
 
+        ax.axis('off')
         return ax
 
     
