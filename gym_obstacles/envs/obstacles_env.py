@@ -190,12 +190,12 @@ class ObstaclesEnv(gym.Env):
         ax.set_xlim(0, 1)
         ax.set_ylim(0, 1)
 
-        ax.scatter(self.state[0], self.state[1], marker='x', legend="start")
-        ax.scatter(self.current_target[0], self.current_target[1], marker='*', legend="goal")
+        ax.scatter(self.state[0], self.state[1], marker='x', label="start")
+        ax.scatter(self.current_target[0], self.current_target[1], marker='*', label="goal")
         
         if self.plan_or_goal == "plan":
             plan = self.desired_goal.reshape(2, self.plan_length)
-            ax.plot(plan[0, :], plan[1, :], legend="plan")
+            ax.plot(plan[0, :], plan[1, :], label="plan")
 
         return ax
 
