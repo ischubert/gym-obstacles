@@ -71,7 +71,7 @@ class ObstaclesEnv(gym.Env):
         """
         # clip action to [-0.1, 0.1]
         action = action + 2*(np.random.rand(2)-0.5)*0.01
-        action = np.clip(action, -0.1, 0.1)
+        action = np.clip(action, -0.1, 0.1).astype(np.float32)
         assert action in self.action_space
 
         # update self.state
