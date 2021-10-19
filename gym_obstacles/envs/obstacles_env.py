@@ -198,6 +198,7 @@ class ObstaclesEnv(gym.Env):
             ax.plot(plan[0, :], plan[1, :], label="plan")
 
         ax.axis('off')
+        ax.legend()
         return ax
 
     

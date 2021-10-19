@@ -1,8 +1,12 @@
 # Obstacle avoidance environment for training plan-conditioned policies
 RL environment for goal- or plan-conditioned RL. The openAI gym API is used.
 
+## 2D maze environment with changing obstacles
 This is a simple 2D maze environment with obstacles.
 The size and location of the obstacles change each time `env.reset()` is called. 3 random examples are shown below:
+![](scripts/0_example.png) |![](scripts/1_example.png) |![](scripts/2_example.png)
+:-------------------------:|:-------------------------:|:-------------------------:
+Reset configuration ex. 1             |  Reset configuration ex. 2           |  Reset configuration ex. 3
 
 A simple RRT planner is used to plan a feasible trajectory after each `env.reset`.
 If the environment is used in plan-conditioned mode, this plan is exposed via the openAI gym API as the desired goal.
@@ -11,7 +15,6 @@ A plan-conditioned RL agent like L2E (https://github.com/ischubert/l2e) can then
 Alternatively, the environment can also be used in goal-conditioned mode.
 Since the obstacles change at each reset, learning a purely goal-conditioned policy, e.g. with Hindsight Experience Replay [Andrychowicz et al. (2017)], will however result in suboptimal behavior.
 
-## 2D maze environment with changing obstacles
 
 
 ## RRT planner
